@@ -2,9 +2,8 @@ const express = require('express');
 const router = express.Router();
 const axios = require('axios');
 
-// ⚠️ IMPORTANTE: Ajusta esta ruta a donde tengas tu conexión a MySQL
-// Viendo tu imagen, parece que está en la carpeta config
-const db = require('../db');
+// Tu conexión a la base de datos
+const db = require('../db'); // (O la ruta que hayas arreglado antes, como ../config/db)
 
 router.post('/analizar', async (req, res) => {
     try {
@@ -34,25 +33,21 @@ router.post('/analizar', async (req, res) => {
             resultadoIA, confianzaIA
         ];
 
-        db.query(querySQL, valores, (error, result) => {
-            if (error) {
-                console.error("❌ Error al guardar en MySQL:", error);
-                return res.status(500).json({ error: "Error al guardar el registro en la base de datos." });
-            }
+        // 🌟 AQUÍ ESTÁ LA MAGIA: Usamos AWAIT en lugar de Callback
+        await db.query(querySQL, valores);
 
-            // 3. Responder a la App Android
-            res.status(200).json({
-                ok: true,
-                mensaje: "Diagnóstico procesado y guardado correctamente",
-                resultado_inteligencia_artificial: respuestaPython.data
-            });
+        // 3. Responder a la App Android INMEDIATAMENTE
+        res.status(200).json({
+            ok: true,
+            mensaje: "Diagnóstico procesado y guardado correctamente",
+            resultado_inteligencia_artificial: respuestaPython.data
         });
 
     } catch (error) {
-        console.error("❌ Error de comunicación con la IA:", error.message);
+        console.error("❌ Error en la ruta de diagnóstico:", error.message);
         res.status(500).json({ 
             ok: false,
-            error: "No se pudo contactar al servidor de Inteligencia Artificial." 
+            error: "Error interno en el servidor Node.js al procesar la IA." 
         });
     }
 });
