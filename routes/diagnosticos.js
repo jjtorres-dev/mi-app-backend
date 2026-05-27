@@ -4,7 +4,7 @@ const axios = require('axios');
 
 // ⚠️ IMPORTANTE: Ajusta esta ruta a donde tengas tu conexión a MySQL
 // Viendo tu imagen, parece que está en la carpeta config
-const db = require('../config/db'); 
+const db = require('../db');
 
 router.post('/analizar', async (req, res) => {
     try {
