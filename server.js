@@ -12,6 +12,7 @@ app.use(express.urlencoded({ extended: true }));
 // ── Rutas ─────────────────────────────────────────────────────────────────────
 app.use('/api/reportes', require('./routes/reportes'));
 app.use('/api/alertas',  require('./routes/alertas'));
+app.use('/api/diagnosticos', require('./routes/diagnosticos')); // 🟢 NUEVO: Ruta de la IA
 
 // ── Ruta de prueba ────────────────────────────────────────────────────────────
 app.get('/', (req, res) => {
@@ -25,7 +26,8 @@ app.get('/', (req, res) => {
             'GET  /api/reportes/total',
             'POST /api/reportes',
             'GET  /api/alertas/hoy',
-            'POST /api/alertas/calcular'
+            'POST /api/alertas/calcular',
+            'POST /api/diagnosticos/analizar' // 🟢 NUEVO: Documentado
         ]
     });
 });
@@ -41,4 +43,6 @@ app.listen(PORT, () => {
     console.log(`   POST http://localhost:${PORT}/api/reportes`);
     console.log(`   GET  http://localhost:${PORT}/api/alertas/hoy`);
     console.log(`   POST http://localhost:${PORT}/api/alertas/calcular`);
+    console.log(`   POST http://localhost:${PORT}/api/diagnosticos/analizar`); // 🟢 NUEVO: Consola
 });
+
