@@ -1,13 +1,18 @@
 {
   "name": "moskicheck-api",
-  "version": "1.0.0",
-  "description": "",
+  "version": "3.0.0",
+  "description": "Backend API de MoskiCheck",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
-  "keywords": [],
+  "keywords": [
+    "moskicheck",
+    "dengue",
+    "zika",
+    "chikungunya"
+  ],
   "author": "",
   "license": "ISC",
   "type": "commonjs",
