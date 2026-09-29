@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const axios = require('axios');
 const db = require('../db');
+const registrarError = require('../utils/log-error');
 
 
 // ============================================================
@@ -171,6 +172,8 @@ router.post(
 
                 return res.status(503).json({
                     ok: false,
+                    mensaje:
+                        'El servicio de inteligencia artificial no está configurado correctamente.',
                     error:
                         'El servicio de inteligencia artificial no está configurado correctamente.'
                 });
@@ -191,6 +194,8 @@ router.post(
 
                 return res.status(400).json({
                     ok: false,
+                    mensaje:
+                        validacion.mensaje,
                     error:
                         'Datos de evaluación inválidos.',
                     detalle:
@@ -266,25 +271,13 @@ router.post(
 
             } catch (errorIA) {
 
-                console.error(
-                    '❌ Error comunicándose con MoskiCheck IA:',
-                    errorIA.message
-                );
-
-
-                if (
-                    errorIA.response?.data
-                ) {
-
-                    console.error(
-                        'Detalle MoskiCheck IA:',
-                        errorIA.response.data
-                    );
-                }
+                registrarError('❌ Error comunicándose con MoskiCheck IA:', errorIA);
 
 
                 return res.status(502).json({
                     ok: false,
+                    mensaje:
+                        'No fue posible comunicarse correctamente con el servicio de inteligencia artificial.',
                     error:
                         'No fue posible comunicarse correctamente con el servicio de inteligencia artificial.'
                 });
@@ -302,14 +295,15 @@ router.post(
                 )
             ) {
 
-                console.error(
-                    '❌ Respuesta inesperada de MoskiCheck IA:',
-                    respuestaIA
-                );
+                registrarError('❌ Respuesta inesperada de MoskiCheck IA:', {
+                    code: 'INVALID_AI_RESPONSE'
+                });
 
 
                 return res.status(502).json({
                     ok: false,
+                    mensaje:
+                        'El servicio de inteligencia artificial devolvió una respuesta inesperada.',
                     error:
                         'El servicio de inteligencia artificial devolvió una respuesta inesperada.'
                 });
@@ -457,7 +451,7 @@ router.post(
             ];
 
 
-            await db.query(
+            await db.execute(
                 querySQL,
                 valores
             );
@@ -475,21 +469,23 @@ router.post(
                     'Evaluación procesada y almacenada correctamente.',
 
                 resultado_inteligencia_artificial:
-                    respuestaIA
+                    respuestaIA,
+
+                data: respuestaIA
             });
 
 
         } catch (error) {
 
-            console.error(
-                '❌ Error en /api/diagnosticos/analizar:',
-                error
-            );
+            registrarError('❌ Error en /api/diagnosticos/analizar:', error);
 
 
             return res.status(500).json({
 
                 ok: false,
+
+                mensaje:
+                    'Error interno del servidor al procesar la evaluación.',
 
                 error:
                     'Error interno del servidor al procesar la evaluación.'
