@@ -1,11 +1,17 @@
 const express = require('express');
 const router  = express.Router();
 const db      = require('../db');
+const { validarTexto } = require('../utils/validation');
+const registrarError = require('../utils/log-error');
 
 // ── GET /api/alertas/hoy ──────────────────────────────────────────────────────
 // Obtener la alerta del distrito para mostrar en el Home
 router.get('/hoy', async (req, res) => {
-    const { distrito } = req.query;
+    const validacion = validarTexto(req.query.distrito, 'distrito');
+    if (validacion.mensaje) {
+        return res.status(400).json({ ok: false, mensaje: validacion.mensaje });
+    }
+    const distrito = validacion.valor;
 
     try {
         let query = `
@@ -22,7 +28,7 @@ router.get('/hoy', async (req, res) => {
 
         query += ' ORDER BY total_reportes DESC';
 
-        const [alertas] = await db.query(query, params);
+        const [alertas] = await db.execute(query, params);
 
         if (alertas.length === 0) {
             return res.json({
@@ -37,7 +43,7 @@ router.get('/hoy', async (req, res) => {
 
         res.json({ ok: true, data: distrito ? alertas[0] : alertas });
     } catch (error) {
-        console.error('Error GET /alertas/hoy:', error);
+        registrarError('Error GET /alertas/hoy:', error);
         res.status(500).json({ ok: false, mensaje: 'Error al obtener alertas' });
     }
 });
@@ -63,7 +69,7 @@ router.post('/calcular', async (req, res) => {
 
             const descripcion = `${zona.total_reportes} criaderos reportados esta semana en ${zona.distrito}.`;
 
-            await db.query(`
+            await db.execute(`
                 INSERT INTO alertas (distrito, nivel, total_reportes, descripcion, fecha)
                 VALUES (?, ?, ?, ?, CURDATE())
                 ON DUPLICATE KEY UPDATE
@@ -73,9 +79,13 @@ router.post('/calcular', async (req, res) => {
             `, [zona.distrito, nivel, zona.total_reportes, descripcion]);
         }
 
-        res.json({ ok: true, mensaje: `Alertas calculadas para ${distritos.length} distritos` });
+        res.json({
+            ok: true,
+            mensaje: `Alertas calculadas para ${distritos.length} distritos`,
+            data: { total_distritos: distritos.length }
+        });
     } catch (error) {
-        console.error('Error POST /alertas/calcular:', error);
+        registrarError('Error POST /alertas/calcular:', error);
         res.status(500).json({ ok: false, mensaje: 'Error al calcular alertas' });
     }
 });

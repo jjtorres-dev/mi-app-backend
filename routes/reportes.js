@@ -1,6 +1,8 @@
 const express = require('express');
 const router  = express.Router();
 const db      = require('../db');
+const { validarReporte } = require('../utils/validation');
+const registrarError = require('../utils/log-error');
 
 // ── GET /api/reportes ─────────────────────────────────────────────────────────
 // Obtener todos los reportes (para ReportsScreen)
@@ -9,7 +11,7 @@ router.get('/', async (req, res) => {
         const [reportes] = await db.query(`
             SELECT 
                 r.id,
-                r.nombre,
+                CASE WHEN r.es_anonimo = 1 THEN 'Anónimo' ELSE r.nombre END AS nombre,
                 r.distrito,
                 r.barrio,
                 r.tipo_criadero,
@@ -17,16 +19,13 @@ router.get('/', async (req, res) => {
                 r.foto_path,
                 r.fecha_hora,
                 r.es_anonimo,
-                r.estado,
-                u.nombre    AS usuario_nombre,
-                u.apellidos AS usuario_apellidos
+                r.estado
             FROM reportes r
-            LEFT JOIN usuarios u ON r.usuario_id = u.id
             ORDER BY r.fecha_hora DESC
         `);
         res.json({ ok: true, data: reportes });
     } catch (error) {
-        console.error('Error GET /reportes:', error);
+        registrarError('Error GET /reportes:', error);
         res.status(500).json({ ok: false, mensaje: 'Error al obtener reportes' });
     }
 });
@@ -51,7 +50,7 @@ router.get('/por-distrito', async (req, res) => {
         `);
         res.json({ ok: true, data: zonas });
     } catch (error) {
-        console.error('Error GET /reportes/por-distrito:', error);
+        registrarError('Error GET /reportes/por-distrito:', error);
         res.status(500).json({ ok: false, mensaje: 'Error al obtener reportes por distrito' });
     }
 });
@@ -64,7 +63,7 @@ router.get('/total', async (req, res) => {
         const [[{ total_distritos }]] = await db.query('SELECT COUNT(DISTINCT distrito) AS total_distritos FROM reportes');
         res.json({ ok: true, data: { total_reportes, total_distritos } });
     } catch (error) {
-        console.error('Error GET /reportes/total:', error);
+        registrarError('Error GET /reportes/total:', error);
         res.status(500).json({ ok: false, mensaje: 'Error al obtener totales' });
     }
 });
@@ -72,6 +71,11 @@ router.get('/total', async (req, res) => {
 // ── POST /api/reportes ────────────────────────────────────────────────────────
 // Guardar un nuevo reporte desde la app (ReportScreen)
 router.post('/', async (req, res) => {
+    const validacion = validarReporte(req.body);
+    if (validacion.mensaje) {
+        return res.status(400).json({ ok: false, mensaje: validacion.mensaje });
+    }
+
     const {
         usuario_id,
         nombre,
@@ -81,30 +85,22 @@ router.post('/', async (req, res) => {
         descripcion,
         foto_path,
         es_anonimo
-    } = req.body;
-
-    // Validación básica
-    if (!distrito || !tipo_criadero) {
-        return res.status(400).json({
-            ok: false,
-            mensaje: 'Distrito y tipo de criadero son obligatorios'
-        });
-    }
+    } = validacion.reporte;
 
     try {
-        const [result] = await db.query(`
+        const [result] = await db.execute(`
             INSERT INTO reportes 
                 (usuario_id, nombre, distrito, barrio, tipo_criadero, descripcion, foto_path, es_anonimo)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?)
         `, [
-            usuario_id  || null,
-            es_anonimo  ? 'Anónimo' : (nombre || 'Anónimo'),
+            usuario_id,
+            es_anonimo ? 'Anónimo' : (nombre || 'Anónimo'),
             distrito,
-            barrio      || null,
+            barrio,
             tipo_criadero,
-            descripcion || null,
-            foto_path   || null,
-            es_anonimo  ? true : false
+            descripcion,
+            foto_path,
+            es_anonimo
         ]);
 
         res.status(201).json({
@@ -113,7 +109,7 @@ router.post('/', async (req, res) => {
             id: result.insertId
         });
     } catch (error) {
-        console.error('Error POST /reportes:', error);
+        registrarError('Error POST /reportes:', error);
         res.status(500).json({ ok: false, mensaje: 'Error al guardar el reporte' });
     }
 });

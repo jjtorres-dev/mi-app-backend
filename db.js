@@ -1,5 +1,6 @@
 const mysql = require('mysql2');
 require('dotenv').config();
+const registrarError = require('./utils/log-error');
 
 const pool = mysql.createPool({
     host:     process.env.DB_HOST,
@@ -9,16 +10,17 @@ const pool = mysql.createPool({
     database: process.env.DB_NAME,
     waitForConnections: true,
     connectionLimit:    10,
-    queueLimit:         0
+    queueLimit:         0,
+    multipleStatements: false
 });
 
 // Verificar conexión al arrancar
 pool.getConnection((err, connection) => {
     if (err) {
-        console.error('❌ Error conectando a MySQL:', err.message);
+        registrarError('❌ Error conectando a MySQL:', err);
         return;
     }
-    console.log('✅ Conectado a MySQL - moskicheck_db');
+    console.log('✅ Conectado a MySQL');
     connection.release();
 });
 
