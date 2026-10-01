@@ -60,6 +60,39 @@ function validarReporte(body) {
         return { mensaje: 'usuario_id debe ser un entero positivo' };
     }
 
+    for (const [campo, minimo, maximo] of [
+        ['latitude', -90, 90], ['longitude', -180, 180], ['accuracy', 0, Number.MAX_VALUE]
+    ]) {
+        const valor = body[campo];
+        if (valor === undefined || valor === null || valor === '') {
+            reporte[campo] = null;
+        } else if (typeof valor === 'number' && Number.isFinite(valor) && valor >= minimo && valor <= maximo) {
+            reporte[campo] = valor;
+        } else {
+            return { mensaje: `${campo} debe ser un número válido` };
+        }
+    }
+    if ((reporte.latitude === null) !== (reporte.longitude === null)) {
+        return { mensaje: 'latitude y longitude deben enviarse juntas' };
+    }
+    if (reporte.latitude === null && reporte.accuracy !== null) {
+        return { mensaje: 'accuracy requiere coordenadas' };
+    }
+
+    const capturedAt = body.locationCapturedAt;
+    if (capturedAt === undefined || capturedAt === null || capturedAt === '') {
+        reporte.locationCapturedAt = null;
+    } else if (typeof capturedAt === 'string' &&
+        /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?Z$/.test(capturedAt) &&
+        Number.isFinite(Date.parse(capturedAt))) {
+        reporte.locationCapturedAt = new Date(capturedAt).toISOString().slice(0, 23).replace('T', ' ');
+    } else {
+        return { mensaje: 'locationCapturedAt debe ser una fecha UTC válida' };
+    }
+    if (reporte.latitude === null && reporte.locationCapturedAt !== null) {
+        return { mensaje: 'locationCapturedAt requiere coordenadas' };
+    }
+
     return { reporte };
 }
 

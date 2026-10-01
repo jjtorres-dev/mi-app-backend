@@ -19,7 +19,11 @@ router.get('/', async (req, res) => {
                 r.foto_path,
                 r.fecha_hora,
                 r.es_anonimo,
-                r.estado
+                r.estado,
+                CAST(r.latitude AS DOUBLE) AS latitude,
+                CAST(r.longitude AS DOUBLE) AS longitude,
+                r.accuracy,
+                DATE_FORMAT(r.location_captured_at, '%Y-%m-%dT%H:%i:%s.%fZ') AS locationCapturedAt
             FROM reportes r
             ORDER BY r.fecha_hora DESC
         `);
@@ -84,14 +88,19 @@ router.post('/', async (req, res) => {
         tipo_criadero,
         descripcion,
         foto_path,
-        es_anonimo
+        es_anonimo,
+        latitude,
+        longitude,
+        accuracy,
+        locationCapturedAt
     } = validacion.reporte;
 
     try {
         const [result] = await db.execute(`
             INSERT INTO reportes 
-                (usuario_id, nombre, distrito, barrio, tipo_criadero, descripcion, foto_path, es_anonimo)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                (usuario_id, nombre, distrito, barrio, tipo_criadero, descripcion, foto_path,
+                 es_anonimo, latitude, longitude, accuracy, location_captured_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `, [
             usuario_id,
             es_anonimo ? 'Anónimo' : (nombre || 'Anónimo'),
@@ -100,7 +109,11 @@ router.post('/', async (req, res) => {
             tipo_criadero,
             descripcion,
             foto_path,
-            es_anonimo
+            es_anonimo,
+            latitude,
+            longitude,
+            accuracy,
+            locationCapturedAt
         ]);
 
         res.status(201).json({

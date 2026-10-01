@@ -40,6 +40,8 @@ test('integración HTTP con MySQL real y esquema de prueba', {
             tipo_criadero VARCHAR(255) NOT NULL, descripcion TEXT, foto_path VARCHAR(2048),
             fecha_hora DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
             es_anonimo TINYINT NOT NULL DEFAULT 0, estado VARCHAR(30) NOT NULL DEFAULT 'pendiente',
+            latitude DECIMAL(10,7) NULL, longitude DECIMAL(10,7) NULL,
+            accuracy FLOAT NULL, location_captured_at DATETIME(3) NULL,
             FOREIGN KEY (usuario_id) REFERENCES usuarios(id)
         )`,
         `CREATE TABLE alertas (
@@ -105,10 +107,14 @@ test('integración HTTP con MySQL real y esquema de prueba', {
         assert.equal(response.status, 200);
         assert.deepEqual(Object.keys(response.body.data[0]).sort(), [
             'id', 'nombre', 'distrito', 'barrio', 'tipo_criadero', 'descripcion',
-            'foto_path', 'fecha_hora', 'es_anonimo', 'estado'
+            'foto_path', 'fecha_hora', 'es_anonimo', 'estado',
+            'latitude', 'longitude', 'accuracy', 'locationCapturedAt'
         ].sort());
         assert.equal(response.body.data[0].nombre, 'Anónimo');
         assert.equal(response.body.data[0].es_anonimo, 1);
+        for (const campo of ['latitude', 'longitude', 'accuracy', 'locationCapturedAt']) {
+            assert.equal(response.body.data[0][campo], null);
+        }
         assert.doesNotMatch(JSON.stringify(response.body), /privado/);
     });
     await t.test('POST /api/reportes conserva formulario y nombres voluntarios', async () => {
@@ -136,6 +142,21 @@ test('integración HTTP con MySQL real y esquema de prueba', {
         assert.equal(row.usuario_id, 1);
         assert.equal(row.barrio, null);
     });
+    await t.test('POST y GET /api/reportes conservan ubicación opcional', async () => {
+        const response = await solicitar('/api/reportes', {
+            distrito: 'Piura', tipo_criadero: 'Llanta/cubierta', latitude: -6.487,
+            longitude: -76.36, accuracy: 12.5, locationCapturedAt: '2026-09-30T12:34:56.789Z'
+        });
+        assert.equal(response.status, 201);
+        const [[row]] = await connection.execute('SELECT * FROM reportes WHERE id = ?', [response.body.id]);
+        assert.equal(Number(row.latitude), -6.487);
+        assert.equal(Number(row.longitude), -76.36);
+        assert.equal(row.accuracy, 12.5);
+        const listado = await solicitar('/api/reportes');
+        const guardado = listado.body.data.find(item => item.id === response.body.id);
+        assert.equal(Number(guardado.latitude), -6.487);
+        assert.equal(guardado.locationCapturedAt, '2026-09-30T12:34:56.789000Z');
+    });
     await t.test('SQL preparado almacena intentos de inyección como texto', async () => {
         const texto = "O'Connor'; DROP TABLE usuarios; --";
         const response = await solicitar('/api/reportes', {
@@ -150,15 +171,15 @@ test('integración HTTP con MySQL real y esquema de prueba', {
     await t.test('GET /api/reportes/total mantiene números y campos Android', async () => {
         const response = await solicitar('/api/reportes/total');
         assert.equal(response.status, 200);
-        assert.deepEqual(response.body, { ok: true, data: { total_reportes: 4, total_distritos: 2 } });
+        assert.deepEqual(response.body, { ok: true, data: { total_reportes: 5, total_distritos: 2 } });
     });
     await t.test('GET /api/reportes/por-distrito mantiene ranking semanal', async () => {
         const response = await solicitar('/api/reportes/por-distrito');
         assert.equal(response.status, 200);
         const piura = response.body.data.find(zona => zona.distrito === 'Piura');
-        assert.equal(piura.total_reportes, 3);
+        assert.equal(piura.total_reportes, 4);
         assert.equal(Number(piura.recipiente), 1);
-        assert.equal(Number(piura.llanta), 1);
+        assert.equal(Number(piura.llanta), 2);
         assert.equal(Number(piura.acequia), 1);
         assert.equal(Number(piura.maleza), 0);
         assert.equal(Number(piura.basura), 0);
@@ -167,7 +188,7 @@ test('integración HTTP con MySQL real y esquema de prueba', {
         const response = await solicitar('/api/reportes', { distrito: ' ', tipo_criadero: 'Llanta/cubierta' });
         assert.equal(response.status, 400);
         const [[row]] = await connection.query('SELECT COUNT(*) AS total FROM reportes');
-        assert.equal(row.total, 4);
+        assert.equal(row.total, 5);
     });
     await t.test('POST /api/alertas/calcular es idempotente con clave distrito/fecha', async () => {
         for (let i = 0; i < 2; i++) {
@@ -182,7 +203,7 @@ test('integración HTTP con MySQL real y esquema de prueba', {
         const response = await solicitar('/api/alertas/hoy?distrito=Piura');
         assert.equal(response.status, 200);
         assert.equal(response.body.data.nivel, 'bajo');
-        assert.equal(response.body.data.total_reportes, 3);
+        assert.equal(response.body.data.total_reportes, 4);
     });
     await t.test('POST /api/diagnosticos/analizar persiste los 14 campos sin cambiar lógica IA', async () => {
         const evaluacion = Object.fromEntries([

@@ -118,7 +118,8 @@ test('reportes, totales y ranking conservan sus envoltorios Android', async () =
     const row = {
         id: 1, nombre: 'Nombre voluntario', distrito: 'Piura', barrio: null,
         tipo_criadero: 'Recipiente con agua', descripcion: null, foto_path: null,
-        fecha_hora: '2026-09-28T12:00:00.000Z', es_anonimo: 0, estado: 'pendiente'
+        fecha_hora: '2026-09-28T12:00:00.000Z', es_anonimo: 0, estado: 'pendiente',
+        latitude: null, longitude: null, accuracy: null, locationCapturedAt: null
     };
     consultar = async () => [[row]];
     assert.deepEqual((await solicitar('/api/reportes')).body, { ok: true, data: [row] });
@@ -138,7 +139,27 @@ test('POST conserva id principal, nombres voluntarios y campos opcionales', asyn
     });
     assert.equal(response.status, 201);
     assert.deepEqual(response.body, { ok: true, mensaje: 'Reporte guardado correctamente', id: 42 });
-    assert.deepEqual(valores, [null, 'Ana Pérez', 'Piura', null, 'Recipiente con agua', null, null, false]);
+    assert.deepEqual(valores, [null, 'Ana Pérez', 'Piura', null, 'Recipiente con agua', null, null,
+        false, null, null, null, null]);
+});
+
+test('POST guarda una captura puntual y rechaza coordenadas incompletas', async () => {
+    let valores;
+    ejecutar = async (_sql, params) => { valores = params; return [{ insertId: 43 }]; };
+    const fecha = '2026-09-30T12:34:56.789Z';
+    const correcto = await solicitar('/api/reportes', {
+        ...reporte, latitude: -6.487, longitude: -76.36, accuracy: 12.5, locationCapturedAt: fecha
+    });
+    assert.equal(correcto.status, 201);
+    assert.deepEqual(valores.slice(8), [-6.487, -76.36, 12.5, '2026-09-30 12:34:56.789']);
+    for (const datos of [
+        { latitude: -6.487 }, { longitude: -76.36 }, { latitude: 91, longitude: 0 },
+        { latitude: 0, longitude: -181 }, { latitude: 0, longitude: 0, accuracy: -1 },
+        { accuracy: 5 }, { locationCapturedAt: fecha },
+        { latitude: 0, longitude: 0, locationCapturedAt: 'ayer' }
+    ]) {
+        assert.equal((await solicitar('/api/reportes', { ...reporte, ...datos })).status, 400);
+    }
 });
 
 test('anonimato admite booleanos y 0/1 sin confundir la cadena false', async () => {
